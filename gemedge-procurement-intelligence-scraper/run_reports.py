@@ -15,7 +15,6 @@ Usage:
     ./venv/bin/python run_reports.py
 """
 
-import json
 import sys
 from pathlib import Path
 

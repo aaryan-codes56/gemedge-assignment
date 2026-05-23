@@ -150,5 +150,4 @@ def get_selector_fallback(
     """
     if key in category_map:
         return category_map[key]
-    logger.warning(f"Selector Query: Locator key '{key}' not found in target selector map.")
     return []

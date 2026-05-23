@@ -1,6 +1,5 @@
 import time
 import functools
-import logging
 from typing import Callable, Any, Tuple, Type, Optional
 
 from src.config import RETRY_CONFIG

@@ -1,4 +1,4 @@
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 from urllib.parse import urljoin
 from selenium.webdriver.remote.webelement import WebElement
 from selenium.webdriver.common.by import By

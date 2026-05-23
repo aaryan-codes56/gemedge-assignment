@@ -1,8 +1,7 @@
 import json
-import logging
 import threading
 from pathlib import Path
-from typing import Dict, Any, List, Set, Optional
+from typing import Set
 
 from src.config import OUTPUT_PATHS
 from src.core.error_handler import ScraperStatePersistenceException

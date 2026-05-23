@@ -8,12 +8,13 @@ from selenium.common.exceptions import (
     TimeoutException,
     StaleElementReferenceException,
     ElementClickInterceptedException,
-    ElementNotInteractableException
+    ElementNotInteractableException,
+    NoSuchElementException
 )
 
 from src.core.base import BaseScraper
 from src.config import BASE_URL, TIMEOUTS, GeMSelectors, get_selector_fallback, DEVELOPER_MODE
-from src.core.wait_utils import wait_for_element_presence, wait_for_visibility, wait_for_clickable
+from src.core.wait_utils import wait_for_element_presence
 from src.core.retry_utils import retry
 from src.core.error_handler import (
     ErrorHandler,
@@ -93,9 +94,9 @@ class GemPortalScraper(BaseScraper):
         while True:
             # 1. Inspect current visual page number
             current_page = self.get_current_page_number()
-            self.logger.info(f"==================================================")
+            self.logger.info("==================================================")
             self.logger.info(f"   PROCESSING LISTING PAGE: {current_page} (Active Run: {pages_scraped_this_run + 1}/{max_pages})")
-            self.logger.info(f"==================================================")
+            self.logger.info("==================================================")
 
             # 2. Check if page was already fully parsed in a previous run
             if current_page <= resume_page:
@@ -772,8 +773,9 @@ class GemPortalScraper(BaseScraper):
         if not locators:
             return
 
-        from selenium.webdriver.support.wait import WebDriverWait
+        from selenium.webdriver.support.ui import WebDriverWait
         from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException
 
         for loc in locators:
             try:

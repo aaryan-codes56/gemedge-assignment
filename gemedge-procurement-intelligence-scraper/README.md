@@ -1,141 +1,121 @@
-# GeM Procurement Intelligence Scraper Foundation
+# GeM Procurement Intelligence Platform
 
-A production-grade, highly scalable, and modular automation foundation built in Python 3.11+ using Selenium, Pandas, and webdriver-manager.
-
-This project implements the foundational architecture for an advanced procurement intelligence collection system targeting the Government e-Marketplace (GeM) Bids Portal:
-[https://bidplus.gem.gov.in/all-bids](https://bidplus.gem.gov.in/all-bids).
+> **A production-grade, stealth-capable web automation and intelligence extraction platform built to monitor, harvest, and analyze public procurement data from the Government e-Marketplace (GeM) portal.**
 
 ---
 
-## 🏛️ Architectural Overview
+## 🎯 Project Overview
 
-The project is structured according to the **SOLID Design Principles** and strict separation of concerns to avoid monolithic scripts. Each phase of the data scraping lifecycle is mapped to decoupled, abstract interfaces, making the repository future-proof and resilient to portal changes.
+The **GeM Procurement Intelligence Platform** is a highly resilient Python-based automation engine designed to navigate the dynamic and heavily protected GeM portal. It extracts active bid listings, traverses deep detail tabs, captures vendor competition intelligence, normalizes complex procurement datasets, and generates BI-ready analytics reports.
 
-### Core Architecture Layers
-
-1. **Config-Driven Settings (`src.config`)**: Standardized environment variable ingestion, strict timeout policies, and relative path mappings.
-2. **Browser Engine (`src.core.driver_factory`)**: Manages isolated Chrome instances with optimal headless sandboxing and anti-detection configurations.
-3. **Wait & Retry Engine (`src.core.wait_utils` & `src.core.retry_utils`)**: Reusable decorator-driven retries (exponential backoff) and explicit DOM state monitors instead of random thread sleeps.
-4. **Abstract Contracts (`src.scraper`, `src.extractor`, `src.cleaner`, `src.insights`)**: Explicit abstract interface classes establishing modular blueprints for data processing.
+Built with **SOLID principles**, modular architecture, and robust anti-detection mechanisms, this platform is designed to operate autonomously while surviving network fluctuations, DOM mutations, and browser instability.
 
 ---
 
-## 📂 Project Structure
+## 💡 The Business Problem
+
+Government procurement portals are notoriously difficult to scrape due to:
+1. **Dynamic DOMs**: Elements constantly change IDs and locations.
+2. **Anti-Scraping Defenses**: Immediate IP blocking or captcha challenges for naive automation.
+3. **Data Fragmentation**: Vital competition data is hidden inside deeply nested, asynchronously loaded accordion panels.
+4. **Unstructured Text**: Dates, currencies, and ministry names are inconsistently formatted.
+
+**The Solution:** An intelligent, state-aware automation engine that mimics human interaction, anticipates structural shifts through synonym-based parsing, safely recovers from crashes, and normalizes unstructured data into SQL/BI-ready formats.
+
+---
+
+## 🏗️ System Architecture & Engineering Highlights
+
+This platform uses a heavily decoupled architecture consisting of four independent layers:
+
+1. **Automation Layer (`scraper`)**: Manages the stealth Selenium WebDriver, tab orchestration, DOM synchronization, and health checks.
+2. **Extraction Layer (`extractor`)**: Parses raw WebElements/HTML into structured Pydantic-style dataclasses using synonym dictionaries (avoiding brittle hardcoded XPath indexes).
+3. **Normalization Layer (`cleaner`)**: Cleanses currencies, standardizes dates to ISO 8601, normalizes unicode text, and resolves dataset integrity.
+4. **Intelligence Layer (`insights`)**: Computes competition metrics, vendor win rates, pricing spreads, and flags procurement anomalies.
+
+### Key Engineering Features
+- **Stealth & Resilience**: Implements `webdriver-manager` with specialized Chrome options (`--disable-blink-features=AutomationControlled`), custom User-Agents, and intelligent implicit/explicit wait strategies.
+- **Stateful Checkpointing**: Persists extraction state to disk after every page, enabling safe resumption from crashes without re-scraping data.
+- **Dynamic Header Resolution**: Employs synonym dictionaries (`_TECH_COL_SYNONYMS`) to dynamically map varying table column structures at runtime.
+- **Anomaly Detection**: Automatically flags single-vendor bids, suspicious pricing spreads, missing ranks, and duplicate quotes.
+- **Multi-Tab Orchestration**: Safely navigates deep result links in background tabs, extracts data, and returns focus without state loss.
+- **Singleton Metrics Tracker**: Thread-safe telemetry system (`MetricsTracker` via `RLock`) tracking extraction throughput, anomaly counts, and error rates.
+
+---
+
+## 📂 Folder Structure
 
 ```text
 gemedge-procurement-intelligence-scraper/
-│
 ├── data/
-│   ├── raw/                  # Downloaded raw JSON page collections
-│   └── processed/            # Normalized, schema-enforced tabular outputs
-│
-├── outputs/                  # High-level analytics reports
-│
-├── screenshots/              # Error diagnostics screenshots
-│
-├── logs/                     # Rotation-safe execution logs
-│
+│   ├── raw/             # Raw JSON/CSV extracted directly from DOM
+│   └── cleaned/         # Normalized, ISO-compliant SQL-ready datasets
+├── docs/                # Architecture diagrams and sample outputs
+├── logs/                # Diagnostic execution logs and DOM dumps
+├── outputs/             # BI-ready intelligence reports and HTML dashboard
+├── scratch/             # Development scripts and offline unit tests
 ├── src/
-│   ├── __init__.py
-│   │
-│   ├── config/               # Settings management and absolute path overrides
-│   │   ├── __init__.py
-│   │   └── settings.py
-│   │
-│   ├── core/                 # Browser drivers, retry decorators, and DOM wait helpers
-│   │   ├── __init__.py
-│   │   ├── driver_factory.py
-│   │   ├── wait_utils.py
-│   │   └── retry_utils.py
-│   │
-│   ├── utils/                # File handlers and Singleton loggers
-│   │   ├── __init__.py
-│   │   ├── logger.py
-│   │   └── file_utils.py
-│   │
-│   ├── scraper/              # Interface definitions for Web Scrapers
-│   │   └── __init__.py
-│   │
-│   ├── extractor/            # Interface definitions for Data Extractors
-│   │   └── __init__.py
-│   │
-│   ├── cleaner/              # Interface definitions for Data Cleaners
-│   │   └── __init__.py
-│   │
-│   └── insights/             # Interface definitions for Business Intelligence
-│       └── __init__.py
-│
-├── tests/                    # Core Unit and Integration tests
-│
-├── .gitignore                # Production cache and ignore configurations
-├── requirements.txt          # Python packages
-├── README.md                 # Documentation
-├── main.py                   # System bootstrap orchestrator
-└── journal.md                # Development & engineering log
+│   ├── cleaner/         # DataNormalizer and atomic text/numeric cleaners
+│   ├── config/          # Centralized environment and settings configuration
+│   ├── core/            # Interfaces (ABCs), Data Models, and DriverFactory
+│   ├── extractor/       # Listing, Detail, and Vendor intelligence extractors
+│   ├── insights/        # ProcurementReportGenerator and analytics engine
+│   ├── scraper/         # Main automation engine and state management
+│   └── utils/           # Singletons (Metrics, Logger), retries, and file I/O
+├── journal.md           # Engineering log detailing daily milestones
+├── main.py              # CLI entry point for the automation scraper
+└── run_normalizer.py    # CLI entry point for data cleaning & reporting
 ```
 
 ---
 
-## 🛠️ Engineering Principles & Standards
+## 🚀 How to Run
 
-- **Strict Explicit Waits Only**: Random time delays (`time.sleep`) are prohibited. Wait utilities use standard polling to wait for exact conditions.
-- **Fail-Safe Operation**: Driver processes are strictly closed via safe shutdown hooks inside `finally` blocks, preventing resource leaks.
-- **Retry-Resilient Logic**: Critical network or DOM retrieval methods are decorated with an exponential backoff retry mechanism.
-- **Logging-First Mentality**: Console and Rotating File Loggers record tracing information detailing exceptions and warnings.
+### Prerequisites
+- Python 3.11+
+- Google Chrome installed locally
+- Virtual Environment
 
----
-
-## 🚀 Setup & Installation
-
-### 1. Prerequisite Checklist
-- **Python**: Version `3.11` or higher.
-- **Google Chrome**: A local installation of Google Chrome or Chromium (ChromeDriver will be downloaded and paired automatically by the driver factory).
-
-### 2. Setup Steps
-
-Clone the repository and navigate to the project directory:
+### Setup
 ```bash
+# Clone the repository
+git clone <repository_url>
 cd gemedge-procurement-intelligence-scraper
-```
 
-Configure a Python virtual environment:
-```bash
-python3 -m venv venv
-source venv/bin/activate
-```
+# Create and activate virtual environment
+python -m venv venv
+source venv/bin/activate  # On Windows use: venv\Scripts\activate
 
-Install the dependencies:
-```bash
+# Install dependencies
 pip install -r requirements.txt
 ```
 
+### Execution
+**1. Run the Automation Scraper**
+Extracts raw data from the GeM portal.
+```bash
+# Run in default headless mode (recommended)
+python main.py
+
+# Run in UI mode (for debugging)
+HEADLESS=false python main.py
+```
+
+**2. Run the Intelligence Pipeline**
+Normalizes the raw data, detects anomalies, and generates intelligence reports.
+```bash
+python run_reports.py
+```
+*(Note: `run_reports.py` automatically executes the cleaning pipeline and generates the dashboard).*
+
 ---
 
-## 🏃 Running the Application
+## 📊 Analytics & Reporting Outputs
 
-To execute the system bootstrap dry-run and verify the browser is configured correctly:
+After executing the intelligence pipeline, check the `outputs/` directory for:
 
-```bash
-python main.py
-```
+1. **`procurement_intelligence_dashboard.html`**: A zero-dependency, static HTML dashboard summarizing all findings.
+2. **`executive_summary.md`**: High-level markdown digest of risks, top vendors, and ministry concentration.
+3. **`*_intelligence_report.csv`**: Flattened, Tableau/PowerBI-ready CSV datasets detailing vendor performance, pricing spreads, and category analytics.
 
-### Expected Output
-The system automatically creates the `data/`, `logs/`, `screenshots/`, and `outputs/` directories, fires up the Selenium engine, fetches the target URL, extracts the target site metadata, and cleanly exits:
-
-```text
-[2026-05-23 18:55:01] [INFO] [file_utils.py:34] - Verified / Created 5 core system directories.
-[2026-05-23 18:55:01] [INFO] [main.py:10] - Initializing gemedge-procurement-intelligence-scraper foundation...
-[2026-05-23 18:55:01] [INFO] [main.py:15] - Launching secure automation browser instance...
-[2026-05-23 18:55:01] [INFO] [driver_factory.py:20] - Initializing browser in HEADLESS mode.
-[2026-05-23 18:55:03] [INFO] [driver_factory.py:53] - Selenium WebDriver created successfully.
-[2026-05-23 18:55:03] [INFO] [main.py:19] - Navigating to primary procurement target: https://bidplus.gem.gov.in/all-bids
-[2026-05-23 18:55:06] [INFO] [main.py:25] - ==================================================
-[2026-05-23 18:55:06] [INFO] [main.py:26] -        SYSTEM FOUNDATION INITIALIZED SUCCESSFULLY   
-[2026-05-23 18:55:06] [INFO] [main.py:27] - ==================================================
-[2026-05-23 18:55:06] [INFO] [main.py:28] - Verified Title : Bid Plus | Government e-Marketplace (GeM)
-[2026-05-23 18:55:06] [INFO] [main.py:29] - Verified URL   : https://bidplus.gem.gov.in/all-bids
-[2026-05-23 18:55:06] [INFO] [main.py:30] - ==================================================
-[2026-05-23 18:55:06] [INFO] [driver_factory.py:64] - Initiating browser shutdown sequence...
-[2026-05-23 18:55:06] [INFO] [driver_factory.py:67] - Browser shut down safely and resources released.
-[2026-05-23 18:55:06] [INFO] [main.py:40] - System foundation terminated and cleaned up successfully.
-```
+For detailed sample outputs and architecture diagrams, please refer to the `docs/` folder.

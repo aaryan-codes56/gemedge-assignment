@@ -13,11 +13,10 @@ Inherits BaseInsightsGenerator. Transforms cleaned datasets into:
 
 from __future__ import annotations
 
-import json
 import textwrap
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict
 
 import pandas as pd
 
@@ -143,7 +142,7 @@ class ProcurementReportGenerator(BaseInsightsGenerator):
 
         participation = _top_n(vendors_df["vendor_name"], 15)
 
-        winners = vendors_df[vendors_df.get("awarded_flag", pd.Series(dtype=bool)) == True]
+        winners = vendors_df[vendors_df.get("awarded_flag", pd.Series(dtype=bool))]
         win_counts = _top_n(winners["vendor_name"], 15) if not winners.empty else {}
 
         # Win rate per vendor
@@ -164,7 +163,7 @@ class ProcurementReportGenerator(BaseInsightsGenerator):
         anomaly_freq: Dict[str, int] = {}
         if anomaly_cols:
             for col in anomaly_cols:
-                flagged = vendors_df[vendors_df[col] == True]["vendor_name"].value_counts()
+                flagged = vendors_df[vendors_df[col]]["vendor_name"].value_counts()
                 for v, cnt in flagged.items():
                     anomaly_freq[str(v)] = anomaly_freq.get(str(v), 0) + int(cnt)
 
@@ -189,7 +188,7 @@ class ProcurementReportGenerator(BaseInsightsGenerator):
 
         # Average vendors per bid (competition intensity) — from vendor eval
         if not vendors_df.empty and "bid_id" in vendors_df.columns:
-            fin_q = vendors_df[vendors_df.get("financially_qualified", pd.Series(dtype=bool)) == True]
+            fin_q = vendors_df[vendors_df.get("financially_qualified", pd.Series(dtype=bool))]
             if not fin_q.empty:
                 competition = fin_q.groupby("bid_id")["vendor_name"].count()
                 result["avg_competition_per_bid"] = round(float(competition.mean()), 2)
@@ -210,7 +209,7 @@ class ProcurementReportGenerator(BaseInsightsGenerator):
             return {"note": "No pricing data available."}
 
         fin = vendors_df[
-            (vendors_df.get("financially_qualified", pd.Series(dtype=bool)) == True) &
+            (vendors_df.get("financially_qualified", pd.Series(dtype=bool))) &
             (vendors_df["quoted_price"] > 0)
         ]
 
@@ -263,7 +262,7 @@ class ProcurementReportGenerator(BaseInsightsGenerator):
             if col in vendors_df.columns:
                 # Count distinct bids (not rows) with this anomaly
                 count = int(
-                    vendors_df[vendors_df[col] == True]["bid_id"].nunique()
+                    vendors_df[vendors_df[col]]["bid_id"].nunique()
                     if "bid_id" in vendors_df.columns
                     else vendors_df[col].sum()
                 )

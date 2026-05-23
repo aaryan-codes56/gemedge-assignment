@@ -1,4 +1,3 @@
-import logging
 from typing import Tuple, Optional
 from selenium.webdriver.remote.webdriver import WebDriver
 from selenium.webdriver.remote.webelement import WebElement

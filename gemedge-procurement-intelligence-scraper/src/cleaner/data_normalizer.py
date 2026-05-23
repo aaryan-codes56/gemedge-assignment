@@ -23,18 +23,17 @@ Outputs:
   outputs/data_quality_report.json
 """
 
-import json
 import re
 import unicodedata
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional
 
 import pandas as pd
 
 from src.core.base import BaseCleaner
 from src.utils.logger import get_logger
-from src.utils.file_utils import save_json, save_csv
+from src.utils.file_utils import save_json
 
 logger = get_logger("data_normalizer")
 
@@ -350,7 +349,7 @@ class DataNormalizer(BaseCleaner):
             f"datetime parse failed for field '{field_hint}': raw='{raw_str}'. "
             f"Storing as None."
         )
-        section_key = "global"
+
         self._quality_report.setdefault("normalization_warnings", []).append(
             f"datetime: '{raw_str}' ({field_hint})"
         )
@@ -502,7 +501,7 @@ class DataNormalizer(BaseCleaner):
         # Inconsistent awarded vendors (winner_name vs L1 vendor_name)
         if not results_df.empty and not vendors_df.empty:
             if "winner_name" in results_df.columns and "awarded_flag" in vendors_df.columns:
-                l1_vendors = vendors_df[vendors_df["awarded_flag"] == True][["bid_id", "vendor_name"]]
+                l1_vendors = vendors_df[vendors_df["awarded_flag"]][["bid_id", "vendor_name"]]
                 for _, row in l1_vendors.iterrows():
                     match = results_df[results_df["bid_id"] == row["bid_id"]]
                     if not match.empty:

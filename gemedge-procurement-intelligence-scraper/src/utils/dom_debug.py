@@ -1,9 +1,8 @@
 import time
 from pathlib import Path
-from typing import Dict, Any, List, Tuple, Optional
+from typing import Dict, Any, Tuple, Optional
 
 from selenium.webdriver.remote.webdriver import WebDriver
-from selenium.webdriver.common.by import By
 
 from src.config import OUTPUT_PATHS
 from src.utils.logger import get_logger

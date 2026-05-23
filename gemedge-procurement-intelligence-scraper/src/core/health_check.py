@@ -1,8 +1,6 @@
 import os
 import socket
-import sys
 from pathlib import Path
-from typing import List, Dict
 
 from src.config import OUTPUT_PATHS, LOG_LEVEL
 from src.utils.logger import get_logger
