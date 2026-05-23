@@ -1,12 +1,12 @@
 # GeM Procurement Intelligence Platform
 
-> **A production-grade, stealth-capable web automation and intelligence extraction platform built to monitor, harvest, and analyze public procurement data from the Government e-Marketplace (GeM) portal.**
+> **Production-grade procurement intelligence scraping and analytics platform built with Python, Selenium, and Pandas. Features resilient automation, deep bid extraction, vendor intelligence analytics, anomaly detection, normalization pipelines, and executive reporting for government procurement data.**
 
 ---
 
 ## 🎯 Project Overview
 
-The **GeM Procurement Intelligence Platform** is a highly resilient Python-based automation engine designed to navigate the dynamic and heavily protected GeM portal. It extracts active bid listings, traverses deep detail tabs, captures vendor competition intelligence, normalizes complex procurement datasets, and generates BI-ready analytics reports.
+The **GeM Procurement Intelligence Platform** is a highly resilient Python-based automation engine designed to monitor, harvest, and analyze public procurement data from the Government e-Marketplace (GeM) portal. It extracts active bid listings, traverses deep detail tabs, captures vendor competition intelligence, normalizes complex procurement datasets, and generates BI-ready analytics reports.
 
 Built with **SOLID principles**, modular architecture, and robust anti-detection mechanisms, this platform is designed to operate autonomously while surviving network fluctuations, DOM mutations, and browser instability.
 
@@ -47,13 +47,10 @@ This platform uses a heavily decoupled architecture consisting of four independe
 
 ```text
 gemedge-procurement-intelligence-scraper/
-├── data/
-│   ├── raw/             # Raw JSON/CSV extracted directly from DOM
-│   └── cleaned/         # Normalized, ISO-compliant SQL-ready datasets
+│
 ├── docs/                # Architecture diagrams and sample outputs
-├── logs/                # Diagnostic execution logs and DOM dumps
 ├── outputs/             # BI-ready intelligence reports and HTML dashboard
-├── scratch/             # Development scripts and offline unit tests
+├── screenshots/         # Dashboard and CLI execution visual evidence
 ├── src/
 │   ├── cleaner/         # DataNormalizer and atomic text/numeric cleaners
 │   ├── config/          # Centralized environment and settings configuration
@@ -62,9 +59,13 @@ gemedge-procurement-intelligence-scraper/
 │   ├── insights/        # ProcurementReportGenerator and analytics engine
 │   ├── scraper/         # Main automation engine and state management
 │   └── utils/           # Singletons (Metrics, Logger), retries, and file I/O
-├── journal.md           # Engineering log detailing daily milestones
+├── tests/               # Unit testing suite
+├── requirements.txt     # Python dependencies
+├── README.md            # Official project documentation
 ├── main.py              # CLI entry point for the automation scraper
-└── run_normalizer.py    # CLI entry point for data cleaning & reporting
+├── run_normalizer.py    # CLI entry point for data cleaning
+├── run_reports.py       # CLI entry point for intelligence reporting
+└── .env.example         # Environment variables configuration
 ```
 
 ---
