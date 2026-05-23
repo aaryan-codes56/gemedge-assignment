@@ -46,7 +46,7 @@ This platform uses a heavily decoupled architecture consisting of four independe
 ## 📂 Folder Structure
 
 ```text
-gemedge-procurement-intelligence-scraper/
+gemedge-assignment/
 │
 ├── docs/                # Architecture diagrams and sample outputs
 ├── outputs/             # BI-ready intelligence reports and HTML dashboard
@@ -81,7 +81,7 @@ gemedge-procurement-intelligence-scraper/
 ```bash
 # Clone the repository
 git clone <repository_url>
-cd gemedge-procurement-intelligence-scraper
+cd gemedge-assignment
 
 # Create and activate virtual environment
 python -m venv venv
