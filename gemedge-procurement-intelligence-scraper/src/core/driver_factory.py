@@ -84,7 +84,6 @@ class DriverFactory:
         if driver is not None:
             try:
                 logger.info("Initiating browser shutdown sequence...")
-                driver.close()
                 driver.quit()
                 logger.info("Browser shut down safely and resources released.")
             except Exception as e:

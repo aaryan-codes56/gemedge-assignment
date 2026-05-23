@@ -16,6 +16,10 @@ USER_AGENT = os.getenv(
     "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
 )
 
+# Developer Diagnostics Mode
+DEVELOPER_MODE = os.getenv("SCRAPER_DEV_MODE", "False").lower() in ("true", "1", "yes")
+
+
 # Centralized Automation Timeouts (Seconds)
 TIMEOUTS: Dict[str, float] = {
     "IMPLICIT_WAIT": float(os.getenv("TIMEOUT_IMPLICIT", "0.0")),  # Explicit wait preferred, set implicit to 0
