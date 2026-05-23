@@ -47,12 +47,12 @@ def main() -> None:
         # 7. Open portal home target
         scraper.open_portal(BASE_URL)
 
-        # 8. Run filter automation workflow
-        logger.info("Applying Status ('Bid/RA') and Outcome ('Awarded') filters...")
+        # 8. Run filter and listing extraction automation workflow
+        logger.info("Applying Status/Outcome filters and executing paginated listing extraction...")
         start_filter_time = time.time()
-        scraper.scrape_data()
+        scraper.scrape_data(max_pages=3)
         filter_duration = time.time() - start_filter_time
-        logger.info(f"Filter automation workflow completed successfully in {filter_duration:.2f} seconds.")
+        logger.info(f"Paginated extraction workflow completed successfully in {filter_duration:.2f} seconds.")
 
         # 9. Developer Mode Diagnostics Checks (If configured active)
         if DEVELOPER_MODE:

@@ -36,6 +36,7 @@ class MetricsTracker:
             self.failed_extractions: int = 0
             self.retry_counts: int = 0
             self.screenshots_captured: int = 0
+            self.duplicate_rows_skipped: int = 0
             self.start_time: float = time.time()
             self.end_time: Optional[float] = None
 
@@ -47,7 +48,7 @@ class MetricsTracker:
     def increment_bids(self, count: int = 1) -> None:
         with self._lock:
             self.total_bids_scraped += count
-            logger.debug(f"Telemetry update: Bids Parsed +{count} (Total: {self.total_bids_scraped})")
+            logger.debug(f"Telemetry update: Bids Scraped +{count} (Total: {self.total_bids_scraped})")
 
     def increment_failures(self, count: int = 1) -> None:
         with self._lock:
@@ -63,6 +64,11 @@ class MetricsTracker:
         with self._lock:
             self.screenshots_captured += count
             logger.debug(f"Telemetry update: Screenshots Captured +{count} (Total: {self.screenshots_captured})")
+
+    def increment_duplicates(self, count: int = 1) -> None:
+        with self._lock:
+            self.duplicate_rows_skipped += count
+            logger.debug(f"Telemetry update: Duplicate Rows Skipped +{count} (Total: {self.duplicate_rows_skipped})")
 
     def end_session(self) -> None:
         with self._lock:
@@ -97,6 +103,7 @@ class MetricsTracker:
                 "failed_extractions": self.failed_extractions,
                 "retry_counts": self.retry_counts,
                 "screenshots_captured": self.screenshots_captured,
+                "duplicate_rows_skipped": self.duplicate_rows_skipped,
                 "execution_duration_seconds": round(duration, 2),
                 "success_rate_percentage": round(success_rate, 2),
                 "timestamp": time.strftime("%Y-%m-%d %H:%M:%S")
@@ -111,12 +118,13 @@ class MetricsTracker:
             f"\n==================================================\n"
             f"          SCRAPER RUN METRICS SUMMARY             \n"
             f"==================================================\n"
-            f" Pages Scraped      : {metrics['total_pages_scraped']}\n"
-            f" Bids Scraped       : {metrics['total_bids_scraped']}\n"
-            f" Failed Extractions : {metrics['failed_extractions']}\n"
-            f" Total Retries      : {metrics['retry_counts']}\n"
-            f" Screenshots Saved  : {metrics['screenshots_captured']}\n"
-            f" Execution Duration : {metrics['execution_duration_seconds']} seconds\n"
-            f" Success Rate (%)   : {metrics['success_rate_percentage']}%\n"
+            f" Pages Scraped          : {metrics['total_pages_scraped']}\n"
+            f" Bids Scraped           : {metrics['total_bids_scraped']}\n"
+            f" Duplicate Rows Skipped : {metrics['duplicate_rows_skipped']}\n"
+            f" Failed Extractions     : {metrics['failed_extractions']}\n"
+            f" Total Retries          : {metrics['retry_counts']}\n"
+            f" Screenshots Saved      : {metrics['screenshots_captured']}\n"
+            f" Execution Duration     : {metrics['execution_duration_seconds']} seconds\n"
+            f" Success Rate (%)       : {metrics['success_rate_percentage']}%\n"
             f"=================================================="
         )

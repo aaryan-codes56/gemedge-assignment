@@ -1,4 +1,5 @@
 import time
+import json
 from typing import Dict, List, Tuple, Optional, Any
 from selenium.webdriver.remote.webdriver import WebDriver
 from selenium.webdriver.remote.webelement import WebElement
@@ -31,7 +32,7 @@ class GemPortalScraper(BaseScraper):
     """
     Enterprise-grade Selenium scraping workflow targeting the Government e-Marketplace (GeM) Bids Portal.
     Orchestrates robust portal navigation, explicit waits, fallback selector mappings,
-    stale element recovery, and success/failure telemetry capture.
+    stale element recovery, paginated listing extraction, and safe incremental file persistence.
     """
 
     def __init__(self, driver: WebDriver) -> None:
@@ -57,12 +58,12 @@ class GemPortalScraper(BaseScraper):
         """
         self.open_portal(url)
 
-    def scrape_data(self) -> List[Dict[str, Any]]:
+    def scrape_data(self, max_pages: int = 3) -> List[Dict[str, Any]]:
         """
-        BaseScraper requirement: Executes the portal filter automation workflow.
-        Returns a dry-run log of applied states.
+        BaseScraper requirement: Applies filters, traverses paginated records,
+        and saves listing details incrementally.
         """
-        self.logger.info("Executing scrape_data: Orchestrating filter application workflow.")
+        self.logger.info("Executing scrape_data: Orchestrating filter application...")
         self.apply_status_filter()
         self.apply_outcome_filter()
         
@@ -71,7 +72,93 @@ class GemPortalScraper(BaseScraper):
             raise ScraperExtractionException("Scraper Verification: Filters failed to apply correctly.")
             
         self.capture_success_artifacts()
-        return [{"workflow": "navigation_and_filters", "status": "success"}]
+
+        # Instantiate Listing Extractor
+        from src.extractor.listing_extractor import ListingExtractor
+        extractor = ListingExtractor()
+
+        # Load State Checkpoint to verify starting page index
+        self.state_manager.load_state()
+        resume_page = self.state_manager.get_last_completed_page()
+        self.logger.info(f"Initiated paginated listing extraction. Resume completed page index: {resume_page}")
+
+        pages_scraped_this_run = 0
+        all_extracted_records: List[Dict[str, Any]] = []
+
+        while True:
+            # 1. Inspect current visual page number
+            current_page = self.get_current_page_number()
+            self.logger.info(f"==================================================")
+            self.logger.info(f"   PROCESSING LISTING PAGE: {current_page} (Active Run: {pages_scraped_this_run + 1}/{max_pages})")
+            self.logger.info(f"==================================================")
+
+            # 2. Check if page was already fully parsed in a previous run
+            if current_page <= resume_page:
+                self.logger.info(f"Page {current_page} already completed in previous run. Skipping extraction.")
+                # Advance next
+                if not self.click_next_page(current_page):
+                    self.logger.info("Reached end of paginated listings during skip advance.")
+                    break
+                continue
+
+            # 3. Locate dynamic listing cards
+            cards = self.find_elements_with_fallback(GeMSelectors.LISTING_TABLE, "bid_blocks")
+            if not cards:
+                self.logger.warning(f"No bid cards resolved on page {current_page} DOM. Checking loader state...")
+                self.wait_for_loader_to_disappear()
+                time.sleep(1.0)
+                cards = self.find_elements_with_fallback(GeMSelectors.LISTING_TABLE, "bid_blocks")
+                if not cards:
+                    self.logger.error(f"Page {current_page} lacks valid bid cards. Capturing page diagnostics.")
+                    self.capture_failure_diagnostics(f"empty_page_{current_page}")
+                    raise ScraperExtractionException(f"Zero listing cards matched on active page {current_page}.")
+
+            # 4. Extract structured records from this page
+            self.logger.info(f"Found {len(cards)} raw listing cards on page {current_page}. Extracting...")
+            batch_records = extractor.extract_batch(cards)
+            self.logger.info(f"Successfully parsed {len(batch_records)} raw records.")
+
+            # 5. Filter duplicates and update state manager memory
+            page_unique_records = []
+            page_duplicates = 0
+            for rec in batch_records:
+                bid_id = rec["bid_id"]
+                if self.state_manager.is_bid_completed(bid_id):
+                    page_duplicates += 1
+                else:
+                    page_unique_records.append(rec)
+                    # Add to state memory
+                    self.state_manager.completed_bid_ids.add(bid_id)
+
+            if page_duplicates > 0:
+                self.logger.info(f"Deduplication: Skipped {page_duplicates} duplicate records already parsed.")
+                self.metrics.increment_duplicates(page_duplicates)
+
+            # 6. Save unique records incrementally
+            if page_unique_records:
+                self.persist_records_incrementally(page_unique_records)
+                all_extracted_records.extend(page_unique_records)
+                self.metrics.increment_bids(len(page_unique_records))
+
+            # 7. Persist page checkpoint to disk
+            self.state_manager.save_state(current_page)
+            self.logger.info(f"Page {current_page} progress checkpoint successfully saved to disk.")
+
+            # 8. Update run session telemetries
+            self.metrics.increment_pages(1)
+            pages_scraped_this_run += 1
+
+            # Assert limits checking
+            if pages_scraped_this_run >= max_pages:
+                self.logger.info(f"Scrape limit reached: completed requested run batch of {max_pages} pages.")
+                break
+
+            # 9. Click Next page to continue traversal
+            if not self.click_next_page(current_page):
+                self.logger.info("Reached final listing page of Government e-Marketplace portal.")
+                break
+
+        return all_extracted_records
 
     def validate(self) -> bool:
         """
@@ -259,6 +346,122 @@ class GemPortalScraper(BaseScraper):
                 self.logger.warning(f"Error encountered during driver quit: {e}")
 
     # ==================================================
+    # PRIVATE PAGINATION & INCREMENTAL PERSISTENCE METHODS
+    # ==================================================
+
+    def get_current_page_number(self) -> int:
+        """Reads the active page number from the pagination bar defensively."""
+        locators = GeMSelectors.PAGINATION["active_page"]
+        for loc in locators:
+            try:
+                elements = self.driver.find_elements(*loc)
+                if elements and elements[0].is_displayed():
+                    txt = elements[0].text.strip()
+                    num_txt = "".join(ch for ch in txt if ch.isdigit())
+                    if num_txt:
+                        return int(num_txt)
+            except Exception:
+                continue
+        return 1
+
+    def click_next_page(self, current_page: int) -> bool:
+        """
+        Attempts to click the next page button and verifies page transition has completed.
+        Returns True if successful, False if last page is reached or transition fails.
+        """
+        next_btn = None
+        locators = GeMSelectors.PAGINATION["next_button"]
+        
+        for loc in locators:
+            try:
+                elements = self.driver.find_elements(*loc)
+                if elements and elements[0].is_displayed():
+                    # Check for parent disables or direct disabled classes
+                    parent_class = ""
+                    try:
+                        parent = elements[0].find_element(By.XPATH, "./..")
+                        parent_class = parent.get_attribute("class") or ""
+                    except Exception:
+                        pass
+                    
+                    btn_class = elements[0].get_attribute("class") or ""
+                    if "disabled" in btn_class or "disabled" in parent_class:
+                        self.logger.info("Next page button exists but is disabled (last page reached).")
+                        return False
+                        
+                    next_btn = elements[0]
+                    break
+            except Exception:
+                continue
+
+        if not next_btn:
+            self.logger.info("Next page button was not found in the DOM (last page reached).")
+            return False
+
+        # Attempt safe robust click sequence with transitions validation
+        max_clicks = 3
+        for attempt in range(max_clicks):
+            try:
+                self.logger.info(f"Clicking next page button (Attempt {attempt + 1}/{max_clicks})...")
+                self.robust_click(next_btn)
+                self.wait_for_loader_to_disappear()
+                time.sleep(1.5) # Dynamic DOM repaint buffer
+
+                # Assert page validation
+                new_page = self.get_current_page_number()
+                if new_page > current_page:
+                    self.logger.info(f"Page transition successful: advanced from page {current_page} to page {new_page}.")
+                    return True
+                else:
+                    self.logger.warning(f"Page number did not advance (remained at {new_page}). Retrying next-click...")
+                    self.metrics.increment_retries(1)
+            except Exception as e:
+                self.logger.error(f"Error during next page click attempt: {e}")
+                self.metrics.increment_retries(1)
+                time.sleep(2.0)
+
+        self.logger.error("Page transition validation failed: maximum click attempts exhausted.")
+        self.capture_failure_diagnostics(f"pagination_failure_page_{current_page}")
+        return False
+
+    def persist_records_incrementally(self, new_records: List[Dict[str, Any]]) -> None:
+        """
+        Saves extracted records incrementally to raw JSON and CSV output paths.
+        Saves under 'data/raw' as configured in central settings.
+        """
+        if not new_records:
+            return
+
+        from src.utils.file_utils import save_json, save_csv
+
+        data_dir = self.state_manager.state_dir
+        json_path = data_dir / "bid_listings.json"
+        csv_path = data_dir / "bid_listings.csv"
+
+        # Load existing json records
+        existing_records = []
+        if json_path.exists():
+            try:
+                with open(json_path, "r", encoding="utf-8") as f:
+                    existing_records = json.load(f)
+            except Exception as e:
+                self.logger.warning(f"Could not load pre-existing JSON at {json_path}: {e}. Creating new array.")
+        
+        # Merge & deduplicate
+        seen_ids = {r["bid_id"] for r in existing_records}
+        added_count = 0
+        for rec in new_records:
+            if rec["bid_id"] not in seen_ids:
+                existing_records.append(rec)
+                seen_ids.add(rec["bid_id"])
+                added_count += 1
+
+        if added_count > 0:
+            save_json(existing_records, json_path)
+            save_csv(existing_records, csv_path)
+            self.logger.info(f"Incrementally appended {added_count} new records to {json_path} and {csv_path}.")
+
+    # ==================================================
     # PRIVATE ROBUST SELENIUM UTILITY HELPERS
     # ==================================================
 
@@ -291,6 +494,29 @@ class GemPortalScraper(BaseScraper):
             message=f"Selector Resolution Exhausted: All fallback locators for key '{key}' timed out.",
             details=f"Attempted list: {locators}"
         )
+
+    def find_elements_with_fallback(
+        self,
+        category_map: Dict[str, List[Tuple[str, str]]],
+        key: str
+    ) -> List[WebElement]:
+        """
+        Finds a list of matching WebElements using fallback selectors.
+        """
+        locators = get_selector_fallback(category_map, key)
+        if not locators:
+            return []
+
+        for idx, loc in enumerate(locators):
+            try:
+                self.logger.debug(f"Attempting batch selector fallback ({idx + 1}/{len(locators)}): {loc}")
+                elements = self.driver.find_elements(*loc)
+                if elements:
+                    self.logger.debug(f"Resolved {len(elements)} elements using locator: {loc}")
+                    return elements
+            except Exception:
+                continue
+        return []
 
     def robust_click(self, element: WebElement) -> None:
         """
@@ -353,7 +579,6 @@ class GemPortalScraper(BaseScraper):
         if not locators:
             return
 
-        # Check visibility and wait until invisible
         from selenium.webdriver.support.wait import WebDriverWait
         from selenium.webdriver.support import expected_conditions as EC
 

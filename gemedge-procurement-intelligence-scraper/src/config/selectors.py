@@ -66,6 +66,7 @@ class GeMSelectors:
     # 3. Listing Grid/Table Elements
     LISTING_TABLE: Dict[str, List[Tuple[str, str]]] = {
         "bid_blocks": [
+            (By.CSS_SELECTOR, "div.card"),
             (By.CSS_SELECTOR, "div.bid_card"),
             (By.XPATH, "//div[contains(@class, 'card')]"),
             (By.CSS_SELECTOR, "div.block_bid")
@@ -97,15 +98,19 @@ class GeMSelectors:
     # 4. Pagination Elements
     PAGINATION: Dict[str, List[Tuple[str, str]]] = {
         "next_button": [
+            (By.CSS_SELECTOR, "a.page-link.next"),
+            (By.CSS_SELECTOR, "a.next"),
             (By.CSS_SELECTOR, "li.next a"),
             (By.XPATH, "//a[contains(text(), 'Next')]"),
             (By.CSS_SELECTOR, "a[rel='next']")
         ],
         "prev_button": [
+            (By.CSS_SELECTOR, "a.page-link.prev"),
             (By.CSS_SELECTOR, "li.prev a"),
             (By.XPATH, "//a[contains(text(), 'Prev')]")
         ],
         "active_page": [
+            (By.CSS_SELECTOR, "span.current"),
             (By.CSS_SELECTOR, "li.active a"),
             (By.XPATH, "//li[contains(@class, 'active')]/a")
         ]
