@@ -1,0 +1,20 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Environment variables
+.env
+.env.local
+
+# Scraper specific outputs and logs
+logs/
+screenshots/
+data/raw/
+data/processed/
+outputs/
+journal.md
+
+# OS specific files
+.DS_Store
