@@ -35,6 +35,7 @@ class MetricsTracker:
             self.total_bids_scraped: int = 0
             self.failed_extractions: int = 0
             self.retry_counts: int = 0
+            self.screenshots_captured: int = 0
             self.start_time: float = time.time()
             self.end_time: Optional[float] = None
 
@@ -57,6 +58,11 @@ class MetricsTracker:
         with self._lock:
             self.retry_counts += count
             logger.debug(f"Telemetry update: Retries Count +{count} (Total: {self.retry_counts})")
+
+    def increment_screenshots(self, count: int = 1) -> None:
+        with self._lock:
+            self.screenshots_captured += count
+            logger.debug(f"Telemetry update: Screenshots Captured +{count} (Total: {self.screenshots_captured})")
 
     def end_session(self) -> None:
         with self._lock:
@@ -90,6 +96,7 @@ class MetricsTracker:
                 "total_bids_scraped": self.total_bids_scraped,
                 "failed_extractions": self.failed_extractions,
                 "retry_counts": self.retry_counts,
+                "screenshots_captured": self.screenshots_captured,
                 "execution_duration_seconds": round(duration, 2),
                 "success_rate_percentage": round(success_rate, 2),
                 "timestamp": time.strftime("%Y-%m-%d %H:%M:%S")
@@ -108,6 +115,7 @@ class MetricsTracker:
             f" Bids Scraped       : {metrics['total_bids_scraped']}\n"
             f" Failed Extractions : {metrics['failed_extractions']}\n"
             f" Total Retries      : {metrics['retry_counts']}\n"
+            f" Screenshots Saved  : {metrics['screenshots_captured']}\n"
             f" Execution Duration : {metrics['execution_duration_seconds']} seconds\n"
             f" Success Rate (%)   : {metrics['success_rate_percentage']}%\n"
             f"=================================================="

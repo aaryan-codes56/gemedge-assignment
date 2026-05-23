@@ -40,6 +40,26 @@ class GeMSelectors:
             (By.ID, "filter_section"),
             (By.CSS_SELECTOR, "div.filter-box"),
             (By.XPATH, "//div[contains(@class, 'filter')]")
+        ],
+        "status_bid_ra_checkbox": [
+            (By.ID, "bidrastatus"),
+            (By.CSS_SELECTOR, "input#bidrastatus"),
+            (By.XPATH, "//input[@id='bidrastatus']")
+        ],
+        "outcome_awarded_checkbox": [
+            (By.ID, "bid_awarded"),
+            (By.CSS_SELECTOR, "input#bid_awarded"),
+            (By.XPATH, "//input[@id='bid_awarded']")
+        ],
+        "ongoing_bids_checkbox": [
+            (By.ID, "ongoing_bids"),
+            (By.CSS_SELECTOR, "input#ongoing_bids"),
+            (By.XPATH, "//input[@id='ongoing_bids']")
+        ],
+        "spinner_loader": [
+            (By.CSS_SELECTOR, "div.loader"),
+            (By.CSS_SELECTOR, ".loader"),
+            (By.XPATH, "//div[contains(@class, 'loader')]")
         ]
     }
 
