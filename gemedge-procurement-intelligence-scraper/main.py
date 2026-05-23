@@ -50,7 +50,7 @@ def main() -> None:
         # 8. Run filter and listing extraction automation workflow
         logger.info("Applying Status/Outcome filters and executing paginated listing extraction...")
         start_filter_time = time.time()
-        scraper.scrape_data(max_pages=3)
+        scraper.scrape_data(max_pages=1)
         filter_duration = time.time() - start_filter_time
         logger.info(f"Paginated extraction workflow completed successfully in {filter_duration:.2f} seconds.")
 

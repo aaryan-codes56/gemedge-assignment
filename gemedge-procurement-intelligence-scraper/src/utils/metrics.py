@@ -37,8 +37,33 @@ class MetricsTracker:
             self.retry_counts: int = 0
             self.screenshots_captured: int = 0
             self.duplicate_rows_skipped: int = 0
+            # Vendor intelligence metrics
+            self.vendor_rows_extracted: int = 0
+            self.anomalies_detected: int = 0
+            self.malformed_evaluations: int = 0
+            self.evaluation_retries: int = 0
             self.start_time: float = time.time()
             self.end_time: Optional[float] = None
+
+    def increment_vendor_rows(self, count: int = 1) -> None:
+        with self._lock:
+            self.vendor_rows_extracted += count
+            logger.debug(f"Telemetry update: Vendor Rows +{count} (Total: {self.vendor_rows_extracted})")
+
+    def increment_anomalies(self, count: int = 1) -> None:
+        with self._lock:
+            self.anomalies_detected += count
+            logger.debug(f"Telemetry update: Anomalies +{count} (Total: {self.anomalies_detected})")
+
+    def increment_malformed(self, count: int = 1) -> None:
+        with self._lock:
+            self.malformed_evaluations += count
+            logger.debug(f"Telemetry update: Malformed Evaluations +{count} (Total: {self.malformed_evaluations})")
+
+    def increment_evaluation_retries(self, count: int = 1) -> None:
+        with self._lock:
+            self.evaluation_retries += count
+            logger.debug(f"Telemetry update: Evaluation Retries +{count} (Total: {self.evaluation_retries})")
 
     def increment_pages(self, count: int = 1) -> None:
         with self._lock:
@@ -98,14 +123,19 @@ class MetricsTracker:
             success_rate = self.get_success_rate()
             
             return {
-                "total_pages_scraped": self.total_pages_scraped,
-                "total_bids_scraped": self.total_bids_scraped,
-                "failed_extractions": self.failed_extractions,
-                "retry_counts": self.retry_counts,
-                "screenshots_captured": self.screenshots_captured,
+                "total_pages_scraped":    self.total_pages_scraped,
+                "total_bids_scraped":     self.total_bids_scraped,
+                "failed_extractions":     self.failed_extractions,
+                "retry_counts":           self.retry_counts,
+                "screenshots_captured":   self.screenshots_captured,
                 "duplicate_rows_skipped": self.duplicate_rows_skipped,
+                # Vendor intelligence
+                "vendor_rows_extracted":  self.vendor_rows_extracted,
+                "anomalies_detected":     self.anomalies_detected,
+                "malformed_evaluations":  self.malformed_evaluations,
+                "evaluation_retries":     self.evaluation_retries,
                 "execution_duration_seconds": round(duration, 2),
-                "success_rate_percentage": round(success_rate, 2),
+                "success_rate_percentage":    round(success_rate, 2),
                 "timestamp": time.strftime("%Y-%m-%d %H:%M:%S")
             }
 
@@ -124,6 +154,10 @@ class MetricsTracker:
             f" Failed Extractions     : {metrics['failed_extractions']}\n"
             f" Total Retries          : {metrics['retry_counts']}\n"
             f" Screenshots Saved      : {metrics['screenshots_captured']}\n"
+            f" Vendor Rows Extracted  : {metrics['vendor_rows_extracted']}\n"
+            f" Anomalies Detected     : {metrics['anomalies_detected']}\n"
+            f" Malformed Evaluations  : {metrics['malformed_evaluations']}\n"
+            f" Evaluation Retries     : {metrics['evaluation_retries']}\n"
             f" Execution Duration     : {metrics['execution_duration_seconds']} seconds\n"
             f" Success Rate (%)       : {metrics['success_rate_percentage']}%\n"
             f"=================================================="

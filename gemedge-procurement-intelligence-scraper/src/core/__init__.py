@@ -25,7 +25,7 @@ from .error_handler import (
 from .state_manager import StateManager
 from .schema_validator import SchemaValidator, ValidationReport
 from .health_check import HealthChecker
-from .models import BidListing
+from .models import BidListing, BidResult, VendorDetail
 
 __all__ = [
     # Base Abstractions
@@ -57,7 +57,10 @@ __all__ = [
     "SchemaValidator",
     "ValidationReport",
     "BidListing",
+    "BidResult",
+    "VendorDetail",
     
     # Health checks
     "HealthChecker",
 ]
+

@@ -61,7 +61,7 @@ class GemPortalScraper(BaseScraper):
     def scrape_data(self, max_pages: int = 3) -> List[Dict[str, Any]]:
         """
         BaseScraper requirement: Applies filters, traverses paginated records,
-        and saves listing details incrementally.
+        opens detailed results tabs safely, parses deep metrics, and saves outputs.
         """
         self.logger.info("Executing scrape_data: Orchestrating filter application...")
         self.apply_status_filter()
@@ -73,9 +73,14 @@ class GemPortalScraper(BaseScraper):
             
         self.capture_success_artifacts()
 
-        # Instantiate Listing Extractor
+        # Instantiate Extractors
         from src.extractor.listing_extractor import ListingExtractor
-        extractor = ListingExtractor()
+        from src.extractor.bid_detail_extractor import BidDetailExtractor
+        from src.extractor.vendor_evaluation_extractor import VendorEvaluationExtractor
+
+        listing_extractor = ListingExtractor()
+        detail_extractor  = BidDetailExtractor()
+        vendor_extractor  = VendorEvaluationExtractor()
 
         # Load State Checkpoint to verify starting page index
         self.state_manager.load_state()
@@ -113,38 +118,145 @@ class GemPortalScraper(BaseScraper):
                     self.capture_failure_diagnostics(f"empty_page_{current_page}")
                     raise ScraperExtractionException(f"Zero listing cards matched on active page {current_page}.")
 
-            # 4. Extract structured records from this page
+            # 4. Process cards, extracting listings and switching to detail tabs
             self.logger.info(f"Found {len(cards)} raw listing cards on page {current_page}. Extracting...")
-            batch_records = extractor.extract_batch(cards)
-            self.logger.info(f"Successfully parsed {len(batch_records)} raw records.")
+            page_unique_listings    = []
+            page_detailed_results   = []
+            page_vendor_evaluations = []
+            page_duplicates         = 0
 
-            # 5. Filter duplicates and update state manager memory
-            page_unique_records = []
-            page_duplicates = 0
-            for rec in batch_records:
-                bid_id = rec["bid_id"]
-                if self.state_manager.is_bid_completed(bid_id):
-                    page_duplicates += 1
-                else:
-                    page_unique_records.append(rec)
-                    # Add to state memory
+            for idx, card in enumerate(cards):
+                try:
+                    # Parse basic listing attributes
+                    rec = listing_extractor.extract_item(card)
+                    if not rec:
+                        self.logger.warning(f"Card [{idx + 1}/{len(cards)}]: Empty extraction result. Skipping.")
+                        continue
+
+                    bid_id = rec["bid_id"]
+
+                    # Deduplication check via state manager
+                    if self.state_manager.is_bid_completed(bid_id):
+                        page_duplicates += 1
+                        continue
+
+                    self.logger.info(f"Processing new bid [{idx + 1}/{len(cards)}]: {bid_id}")
+
+                    # Multi-Tab detail page switching flow
+                    results_btn = None
+                    try:
+                        results_btn = card.find_element(
+                            By.XPATH,
+                            ".//a[contains(@href, 'getBidResultView') or contains(@href, 'getSinglePacketResultView')]"
+                        )
+                    except NoSuchElementException:
+                        pass
+
+                    if results_btn:
+                        parent_handle = self.driver.current_window_handle
+                        self.logger.info(f"Opening detailed result page for {bid_id} in a new tab...")
+                        try:
+                            # Safely click results button
+                            self.robust_click(results_btn)
+                            time.sleep(3.0)
+
+                            # Locate and switch to the new window handle
+                            detail_tab_opened = False
+                            for handle in self.driver.window_handles:
+                                if handle != parent_handle:
+                                    self.driver.switch_to.window(handle)
+                                    detail_tab_opened = True
+                                    break
+
+                            if detail_tab_opened:
+                                self.logger.info(f"Active detail tab URL: {self.driver.current_url}")
+
+                                # ── BidDetailExtractor ───────────────────────────────────
+                                detail_record = detail_extractor.extract_item(self.driver)
+                                if detail_record and detail_extractor.validate(detail_record):
+                                    page_detailed_results.append(detail_record)
+                                    self.logger.info(f"BidDetail extracted for {bid_id}.")
+                                else:
+                                    self.logger.warning(f"BidDetail empty/invalid for {bid_id}.")
+
+                                # ── VendorEvaluationExtractor ────────────────────────────
+                                try:
+                                    eval_result = vendor_extractor.extract_item(self.driver)
+                                    if eval_result and eval_result.get("vendor_records"):
+                                        vendor_rows   = eval_result["vendor_records"]
+                                        anomaly_flags = eval_result.get("anomaly_flags", {})
+                                        valid_rows = []
+                                        for vrow in vendor_rows:
+                                            if vendor_extractor.validate(vrow):
+                                                valid_rows.append(vrow)
+                                            else:
+                                                self.metrics.increment_malformed(1)
+                                        if valid_rows:
+                                            page_vendor_evaluations.extend(valid_rows)
+                                            self.metrics.increment_vendor_rows(len(valid_rows))
+                                        active_anomalies = sum(1 for v in anomaly_flags.values() if v)
+                                        if active_anomalies:
+                                            self.metrics.increment_anomalies(active_anomalies)
+                                        self.logger.info(
+                                            f"Vendor eval: {len(valid_rows)} valid rows, "
+                                            f"{active_anomalies} anomaly flags for {bid_id}."
+                                        )
+                                    else:
+                                        self.logger.warning(f"Vendor eval yielded no rows for {bid_id}.")
+                                except Exception as ve_err:
+                                    self.logger.error(f"VendorEvaluation error for {bid_id}: {ve_err}")
+                                    self.metrics.increment_malformed(1)
+
+                                # Close detail tab
+                                self.driver.close()
+                            else:
+                                self.logger.warning(f"Could not open detail results tab for {bid_id}.")
+                        except Exception as detail_err:
+                            self.logger.error(f"Error during deep detail extraction for {bid_id}: {detail_err}")
+                            self.metrics.increment_failures(1)
+                            # Cleanup open window handles
+                            for handle in self.driver.window_handles:
+                                if handle != parent_handle:
+                                    self.driver.switch_to.window(handle)
+                                    self.driver.close()
+                        finally:
+                            # Re-focus parent tab
+                            self.driver.switch_to.window(parent_handle)
+                            time.sleep(1.0) # Layout stabilization wait
+
+                    # Save and track completed listing
+                    page_unique_listings.append(rec)
                     self.state_manager.completed_bid_ids.add(bid_id)
 
+                except StaleElementReferenceException:
+                    self.logger.warning(f"Listing card index {idx + 1} became stale during page processing. Skipping.")
+                    continue
+                except Exception as e:
+                    self.logger.error(f"Error parsing card index {idx + 1}: {e}")
+                    continue
+
+            # Update duplicate counts
             if page_duplicates > 0:
                 self.logger.info(f"Deduplication: Skipped {page_duplicates} duplicate records already parsed.")
                 self.metrics.increment_duplicates(page_duplicates)
 
-            # 6. Save unique records incrementally
-            if page_unique_records:
-                self.persist_records_incrementally(page_unique_records)
-                all_extracted_records.extend(page_unique_records)
-                self.metrics.increment_bids(len(page_unique_records))
+            # 5. Persist listings, results, and vendor evaluations incrementally
+            if page_unique_listings:
+                self.persist_records_incrementally(page_unique_listings)
+                all_extracted_records.extend(page_unique_listings)
+                self.metrics.increment_bids(len(page_unique_listings))
 
-            # 7. Persist page checkpoint to disk
+            if page_detailed_results:
+                self.persist_results_incrementally(page_detailed_results)
+
+            if page_vendor_evaluations:
+                self.persist_evaluations_incrementally(page_vendor_evaluations)
+
+            # 6. Save page checkpoint to disk
             self.state_manager.save_state(current_page)
             self.logger.info(f"Page {current_page} progress checkpoint successfully saved to disk.")
 
-            # 8. Update run session telemetries
+            # 7. Update run session telemetries
             self.metrics.increment_pages(1)
             pages_scraped_this_run += 1
 
@@ -153,7 +265,7 @@ class GemPortalScraper(BaseScraper):
                 self.logger.info(f"Scrape limit reached: completed requested run batch of {max_pages} pages.")
                 break
 
-            # 9. Click Next page to continue traversal
+            # 8. Click Next page to continue traversal
             if not self.click_next_page(current_page):
                 self.logger.info("Reached final listing page of Government e-Marketplace portal.")
                 break
@@ -460,6 +572,87 @@ class GemPortalScraper(BaseScraper):
             save_json(existing_records, json_path)
             save_csv(existing_records, csv_path)
             self.logger.info(f"Incrementally appended {added_count} new records to {json_path} and {csv_path}.")
+
+    def persist_results_incrementally(self, new_results: List[Dict[str, Any]]) -> None:
+        """
+        Saves detailed bid results incrementally to raw JSON and CSV output paths.
+        Saves under 'data/raw' as configured in central settings.
+        """
+        if not new_results:
+            return
+
+        from src.utils.file_utils import save_json, save_csv
+
+        data_dir = self.state_manager.state_dir
+        json_path = data_dir / "bid_results.json"
+        csv_path = data_dir / "bid_results.csv"
+
+        # Load existing json records
+        existing_records = []
+        if json_path.exists():
+            try:
+                with open(json_path, "r", encoding="utf-8") as f:
+                    existing_records = json.load(f)
+            except Exception as e:
+                self.logger.warning(f"Could not load pre-existing JSON at {json_path}: {e}. Creating new array.")
+        
+        # Merge & deduplicate
+        seen_ids = {r["bid_id"] for r in existing_records}
+        added_count = 0
+        for rec in new_results:
+            if rec["bid_id"] not in seen_ids:
+                existing_records.append(rec)
+                seen_ids.add(rec["bid_id"])
+                added_count += 1
+
+        if added_count > 0:
+            save_json(existing_records, json_path)
+            save_csv(existing_records, csv_path)
+            self.logger.info(f"Incrementally appended {added_count} new detailed results to {json_path} and {csv_path}.")
+
+    def persist_evaluations_incrementally(self, new_evaluations: List[Dict[str, Any]]) -> None:
+        """
+        Saves vendor evaluation rows incrementally to vendor_evaluations.json and .csv.
+        Deduplicates on composite key (bid_id, vendor_name) to prevent double-writing.
+        """
+        if not new_evaluations:
+            return
+
+        from src.utils.file_utils import save_json, save_csv
+
+        data_dir  = self.state_manager.state_dir
+        json_path = data_dir / "vendor_evaluations.json"
+        csv_path  = data_dir / "vendor_evaluations.csv"
+
+        # Load existing records
+        existing_records: List[Dict[str, Any]] = []
+        if json_path.exists():
+            try:
+                with open(json_path, "r", encoding="utf-8") as f:
+                    existing_records = json.load(f)
+            except Exception as e:
+                self.logger.warning(f"Could not load {json_path}: {e}. Starting fresh.")
+
+        # Deduplicate on (bid_id, vendor_name) composite key
+        seen_keys = {
+            (r["bid_id"], r["vendor_name"])
+            for r in existing_records
+        }
+        added_count = 0
+        for rec in new_evaluations:
+            key = (rec.get("bid_id", ""), rec.get("vendor_name", ""))
+            if key not in seen_keys:
+                existing_records.append(rec)
+                seen_keys.add(key)
+                added_count += 1
+
+        if added_count > 0:
+            save_json(existing_records, json_path)
+            save_csv(existing_records, csv_path)
+            self.logger.info(
+                f"Incrementally appended {added_count} vendor evaluation rows "
+                f"to {json_path} and {csv_path}."
+            )
 
     # ==================================================
     # PRIVATE ROBUST SELENIUM UTILITY HELPERS
