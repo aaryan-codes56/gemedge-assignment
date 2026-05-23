@@ -73,41 +73,40 @@ gemedge-assignment/
 ## 🚀 How to Run
 
 ### Prerequisites
-- Python 3.11+
+- **Python 3.11 – 3.13** (⚠️ Python 3.14 is not yet supported by Selenium/Pandas)
 - Google Chrome installed locally
-- Virtual Environment
 
 ### Setup
 ```bash
 # Clone the repository
-git clone <repository_url>
+git clone https://github.com/aaryan-codes56/gemedge-assignment.git
 cd gemedge-assignment
 
-# Create and activate virtual environment
-python -m venv venv
-source venv/bin/activate  # On Windows use: venv\Scripts\activate
+# Create virtual environment (use python3.13 on macOS)
+python3.13 -m venv venv
+source venv/bin/activate        # On Windows: venv\Scripts\activate
 
 # Install dependencies
 pip install -r requirements.txt
 ```
 
 ### Execution
-**1. Run the Automation Scraper**
-Extracts raw data from the GeM portal.
-```bash
-# Run in default headless mode (recommended)
-python main.py
 
-# Run in UI mode (for debugging)
-HEADLESS=false python main.py
+**Step 1 — Run the Scraper** (extracts live data from GeM portal)
+```bash
+python main.py                  # headless mode (recommended)
+HEADLESS=false python main.py   # UI mode — watch the browser work
 ```
 
-**2. Run the Intelligence Pipeline**
-Normalizes the raw data, detects anomalies, and generates intelligence reports.
+**Step 2 — Generate Intelligence Reports** (cleans data → analytics → dashboard)
 ```bash
 python run_reports.py
 ```
-*(Note: `run_reports.py` automatically executes the cleaning pipeline and generates the dashboard).*
+
+**Step 3 — View Outputs**
+Open `outputs/procurement_intelligence_dashboard.html` in any browser to view the analytics dashboard.
+
+> **Note:** `run_reports.py` automatically invokes the cleaning pipeline and generates all CSV, JSON, HTML, and Markdown reports into `outputs/`.
 
 ---
 
